@@ -20,17 +20,30 @@ const fmtPct = new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 1, style:
 /* ---------- État global ---------- */
 const state = {
   hyp: {
-    capacite: 15000,
+    capPopulaire: 14743,
+    capVIP: 1931,
+    capVVIP: 1080,
     remplissage: 0.75,
-    matchs: 17,
+    matchs: 22,
     staffPct: 0.18,
     chargesFixes: 650000,
     marketingPct: 0.03,
+    // Annexes
+    panierVIP: 80,
+    panierVVIP: 180,
+    restauCouverts: 220,
+    restauPanier: 95,
+    nbConcerts: 4,
+    concertJauge: 21000,
+    concertPanier: 22,
   },
   captures: {},          // id -> taux (0..1)
   filter: "ALL",
   charts: {},
 };
+
+// COGS pour revenus annexes
+const COGS_ANNEXES = { vip: 0.30, vvip: 0.32, restau: 0.32, concerts: 0.28 };
 
 /* ---------- Init capture par défaut ---------- */
 OUTLETS_DATA.outlets.forEach(o => {
@@ -46,7 +59,37 @@ function panierMoyen(outlet) {
 }
 
 function spectateursParMatch() {
-  return state.hyp.capacite * state.hyp.remplissage;
+  // Base outlet = zone populaire (A+B), seule zone qui consomme dans les outlets
+  return state.hyp.capPopulaire * state.hyp.remplissage;
+}
+
+function computeAnnexes() {
+  const h = state.hyp;
+  const r = h.remplissage;
+  // Hospitality VIP : forfait inclus dans le pack hospitality, payé pour chaque place occupée
+  const caVIP = h.capVIP * r * h.panierVIP * h.matchs;
+  const caVVIP = h.capVVIP * r * h.panierVVIP * h.matchs;
+  // Restaurant gastro Niv. 6 : couverts servis × ticket × matchs (linéaire au remplissage)
+  const caRestau = h.restauCouverts * r * h.restauPanier * h.matchs;
+  // Concerts : événements externes
+  const caConcerts = h.nbConcerts * h.concertJauge * h.concertPanier;
+
+  const cogsVIP = caVIP * COGS_ANNEXES.vip;
+  const cogsVVIP = caVVIP * COGS_ANNEXES.vvip;
+  const cogsRestau = caRestau * COGS_ANNEXES.restau;
+  const cogsConcerts = caConcerts * COGS_ANNEXES.concerts;
+
+  const totalCA = caVIP + caVVIP + caRestau + caConcerts;
+  const totalCOGS = cogsVIP + cogsVVIP + cogsRestau + cogsConcerts;
+  return {
+    items: [
+      { key: "vip", label: "Hospitality VIP (Niv. 1-2)", ca: caVIP, cogs: cogsVIP },
+      { key: "vvip", label: "Hospitality VVIP (Niv. 3-5)", ca: caVVIP, cogs: cogsVVIP },
+      { key: "restau", label: "Restaurant gastro Niveau 6", ca: caRestau, cogs: cogsRestau },
+      { key: "concerts", label: `Concerts (${h.nbConcerts} événements)`, ca: caConcerts, cogs: cogsConcerts },
+    ],
+    totalCA, totalCOGS, margeBrute: totalCA - totalCOGS,
+  };
 }
 
 function computeOutletMetrics(o) {
@@ -81,34 +124,41 @@ function computeAll() {
     totals.margeParCategorie[r.outlet.categorie] += r.margeBrute;
   });
 
-  const staff = totals.caSaison * state.hyp.staffPct;
-  const marketing = totals.caSaison * state.hyp.marketingPct;
-  const chargesFixes = state.hyp.chargesFixes;
-  const ebitda = totals.margeBrute - staff - marketing - chargesFixes;
+  const annexes = computeAnnexes();
+  const caGlobal = totals.caSaison + annexes.totalCA;
+  const cogsGlobal = totals.cogs + annexes.totalCOGS;
+  const margeBruteGlobale = totals.margeBrute + annexes.margeBrute;
 
-  return { rows, totals, staff, marketing, chargesFixes, ebitda };
+  const staff = caGlobal * state.hyp.staffPct;
+  const marketing = caGlobal * state.hyp.marketingPct;
+  const chargesFixes = state.hyp.chargesFixes;
+  const ebitda = margeBruteGlobale - staff - marketing - chargesFixes;
+
+  return { rows, totals, annexes, caGlobal, cogsGlobal, margeBruteGlobale,
+           staff, marketing, chargesFixes, ebitda };
 }
 
 /* ---------- Rendu KPIs ---------- */
 function renderKPIs(model) {
-  const { totals, ebitda } = model;
+  const { totals, annexes, caGlobal, margeBruteGlobale, ebitda } = model;
   const caMatch = state.hyp.matchs ? totals.caSaison / state.hyp.matchs : 0;
   const spectMatch = spectateursParMatch();
   const panierPond = totals.actesMatch ? caMatch / totals.actesMatch : 0;
 
-  document.getElementById("kpi-ca").textContent = fmt.format(totals.caSaison) + " CHF";
-  document.getElementById("kpi-ca-match").textContent = fmt.format(caMatch) + " CHF / match";
+  document.getElementById("kpi-ca").textContent = fmt.format(caGlobal) + " CHF";
+  document.getElementById("kpi-ca-match").textContent =
+    `${fmt.format(totals.caSaison)} outlets + ${fmt.format(annexes.totalCA)} annexes`;
 
-  document.getElementById("kpi-mb").textContent = fmt.format(totals.margeBrute) + " CHF";
+  document.getElementById("kpi-mb").textContent = fmt.format(margeBruteGlobale) + " CHF";
   document.getElementById("kpi-mb-pct").textContent =
-    (totals.caSaison ? fmtPct.format(totals.margeBrute / totals.caSaison) : "—") + " du CA";
+    (caGlobal ? fmtPct.format(margeBruteGlobale / caGlobal) : "—") + " du CA";
 
   const ebitdaEl = document.getElementById("kpi-ebitda");
   ebitdaEl.textContent = fmt.format(ebitda) + " CHF";
   ebitdaEl.parentElement.classList.toggle("good", ebitda >= 0);
   ebitdaEl.parentElement.classList.toggle("bad", ebitda < 0);
   document.getElementById("kpi-ebitda-pct").textContent =
-    (totals.caSaison ? fmtPct.format(ebitda / totals.caSaison) : "—") + " du CA";
+    (caGlobal ? fmtPct.format(ebitda / caGlobal) : "—") + " du CA";
 
   document.getElementById("kpi-panier").textContent = fmt2.format(panierPond) + " CHF";
   document.getElementById("kpi-spec-actifs").textContent =
@@ -116,6 +166,41 @@ function renderKPIs(model) {
 
   document.getElementById("kpi-ca-spec").textContent =
     (spectMatch ? fmt2.format(caMatch / spectMatch) : "—") + " CHF";
+}
+
+/* ---------- Rendu annexes table ---------- */
+function renderAnnexes(model) {
+  const { annexes } = model;
+  const html = `
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:9px 14px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border);">Source</th>
+        <th style="text-align:right;padding:9px 14px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border);">CA saison</th>
+        <th style="text-align:right;padding:9px 14px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border);">COGS</th>
+        <th style="text-align:right;padding:9px 14px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border);">Marge brute</th>
+        <th style="text-align:right;padding:9px 14px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border);">% du CA annexe</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${annexes.items.map(i => `
+        <tr>
+          <td class="lbl">${i.label}</td>
+          <td class="val">${fmt.format(i.ca)}</td>
+          <td class="val">- ${fmt.format(i.cogs)}</td>
+          <td class="val">${fmt.format(i.ca - i.cogs)}</td>
+          <td class="pct">${annexes.totalCA ? fmtPct.format(i.ca / annexes.totalCA) : "—"}</td>
+        </tr>
+      `).join("")}
+      <tr class="subtotal">
+        <td>Total annexes</td>
+        <td class="val">${fmt.format(annexes.totalCA)}</td>
+        <td class="val">- ${fmt.format(annexes.totalCOGS)}</td>
+        <td class="val">${fmt.format(annexes.margeBrute)}</td>
+        <td class="pct">100%</td>
+      </tr>
+    </tbody>
+  `;
+  document.getElementById("annexes-table").innerHTML = html;
 }
 
 /* ---------- Rendu filtres catégorie ---------- */
@@ -198,35 +283,47 @@ function renderOutletsTable(model) {
 
 /* ---------- Rendu P&L ---------- */
 function renderPnL(model) {
-  const { totals, staff, marketing, chargesFixes, ebitda } = model;
-  const ca = totals.caSaison;
+  const { totals, annexes, caGlobal, cogsGlobal, margeBruteGlobale,
+          staff, marketing, chargesFixes, ebitda } = model;
+  const ca = caGlobal;
   const p = (v) => ca ? fmtPct.format(v / ca) : "—";
   const html = `
     <tbody>
-      <tr><td class="lbl">Chiffre d'affaires - Bars &amp; boissons</td>
+      <tr><td class="lbl">CA Outlets - Bars &amp; boissons</td>
           <td class="val">${fmt.format(totals.parCategorie.D)}</td>
           <td class="pct">${p(totals.parCategorie.D)}</td></tr>
-      <tr><td class="lbl">Chiffre d'affaires - Standards populaires</td>
+      <tr><td class="lbl">CA Outlets - Standards populaires</td>
           <td class="val">${fmt.format(totals.parCategorie.A)}</td>
           <td class="pct">${p(totals.parCategorie.A)}</td></tr>
-      <tr><td class="lbl">Chiffre d'affaires - Saveurs internationales</td>
+      <tr><td class="lbl">CA Outlets - Saveurs internationales</td>
           <td class="val">${fmt.format(totals.parCategorie.B)}</td>
           <td class="pct">${p(totals.parCategorie.B)}</td></tr>
-      <tr><td class="lbl">Chiffre d'affaires - Identité valaisanne</td>
+      <tr><td class="lbl">CA Outlets - Identité valaisanne</td>
           <td class="val">${fmt.format(totals.parCategorie.C)}</td>
           <td class="pct">${p(totals.parCategorie.C)}</td></tr>
-      <tr><td class="lbl">Chiffre d'affaires - Merchandising</td>
+      <tr><td class="lbl">CA Outlets - Merchandising</td>
           <td class="val">${fmt.format(totals.parCategorie.Merch)}</td>
           <td class="pct">${p(totals.parCategorie.Merch)}</td></tr>
+      <tr class="subtotal"><td>Sous-total outlets</td>
+          <td class="val">${fmt.format(totals.caSaison)}</td>
+          <td class="pct">${p(totals.caSaison)}</td></tr>
+      ${annexes.items.map(i => `
+        <tr><td class="lbl">${i.label}</td>
+            <td class="val">${fmt.format(i.ca)}</td>
+            <td class="pct">${p(i.ca)}</td></tr>
+      `).join("")}
+      <tr class="subtotal"><td>Sous-total annexes</td>
+          <td class="val">${fmt.format(annexes.totalCA)}</td>
+          <td class="pct">${p(annexes.totalCA)}</td></tr>
       <tr class="subtotal"><td>Total chiffre d'affaires</td>
           <td class="val">${fmt.format(ca)}</td>
           <td class="pct">100%</td></tr>
       <tr><td class="lbl">Coût des marchandises (COGS)</td>
-          <td class="val">- ${fmt.format(totals.cogs)}</td>
-          <td class="pct">${p(totals.cogs)}</td></tr>
+          <td class="val">- ${fmt.format(cogsGlobal)}</td>
+          <td class="pct">${p(cogsGlobal)}</td></tr>
       <tr class="subtotal"><td>Marge brute</td>
-          <td class="val">${fmt.format(totals.margeBrute)}</td>
-          <td class="pct">${p(totals.margeBrute)}</td></tr>
+          <td class="val">${fmt.format(margeBruteGlobale)}</td>
+          <td class="pct">${p(margeBruteGlobale)}</td></tr>
       <tr><td class="lbl">Masse salariale</td>
           <td class="val">- ${fmt.format(staff)}</td>
           <td class="pct">${p(staff)}</td></tr>
@@ -331,9 +428,9 @@ function renderCharts(model) {
 
   // 4. Évolution mensuelle (line + area)
   destroyChart("monthly");
-  const ca = model.totals.caSaison;
+  const ca = model.caGlobal;
   const monthlyCA = MONTH_KEYS.map(k => ca * MONTHLY_DIST[k]);
-  const monthlyMB = monthlyCA.map(v => v * (ca ? model.totals.margeBrute / ca : 0));
+  const monthlyMB = monthlyCA.map(v => v * (ca ? model.margeBruteGlobale / ca : 0));
   state.charts.monthly = new Chart(document.getElementById("chart-monthly"), {
     type: "line",
     data: {
@@ -378,6 +475,7 @@ function renderCharts(model) {
 function renderAll(opts = {}) {
   const model = computeAll();
   renderKPIs(model);
+  renderAnnexes(model);
   renderPnL(model);
   renderCharts(model);
   if (!opts.skipTableRows) {
@@ -425,12 +523,21 @@ function renderAll(opts = {}) {
 /* ---------- Bind hypothèses ---------- */
 function bindHypotheses() {
   const map = [
-    ["hyp-capacite", "capacite", v => v],
+    ["hyp-cap-pop", "capPopulaire", v => v],
+    ["hyp-cap-vip", "capVIP", v => v],
+    ["hyp-cap-vvip", "capVVIP", v => v],
     ["hyp-remplissage", "remplissage", v => v / 100],
     ["hyp-matchs", "matchs", v => v],
     ["hyp-staff", "staffPct", v => v / 100],
     ["hyp-charges", "chargesFixes", v => v],
     ["hyp-marketing", "marketingPct", v => v / 100],
+    ["hyp-vip-panier", "panierVIP", v => v],
+    ["hyp-vvip-panier", "panierVVIP", v => v],
+    ["hyp-restau-couverts", "restauCouverts", v => v],
+    ["hyp-restau-panier", "restauPanier", v => v],
+    ["hyp-concerts", "nbConcerts", v => v],
+    ["hyp-concert-jauge", "concertJauge", v => v],
+    ["hyp-concert-panier", "concertPanier", v => v],
   ];
   map.forEach(([elId, key, conv]) => {
     document.getElementById(elId).addEventListener("input", e => {

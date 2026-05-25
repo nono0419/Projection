@@ -19,6 +19,7 @@
     <nav class="topnav">
       <a href="#kpis">KPIs</a>
       <a href="#hypotheses">Hypothèses</a>
+      <a href="#annexes">Annexes</a>
       <a href="#charts">Graphiques</a>
       <a href="#outlets">Outlets</a>
       <a href="#pnl">P&amp;L</a>
@@ -61,13 +62,23 @@
 
     <!-- Hypothèses globales -->
     <section id="hypotheses">
-      <h2 class="section-h2">Hypothèses globales</h2>
+      <h2 class="section-h2">Hypothèses globales · Cervin Coliseum</h2>
       <div class="card">
         <div class="hyp-grid">
           <div class="hyp-item">
-            <label>Capacité du stade</label>
-            <input type="number" id="hyp-capacite" min="0" step="500" value="15000" />
-            <div class="hint">spectateurs maxi</div>
+            <label>Capacité populaire (A+B)</label>
+            <input type="number" id="hyp-cap-pop" min="0" step="100" value="14743" />
+            <div class="hint">zone F&B classique</div>
+          </div>
+          <div class="hyp-item">
+            <label>Capacité VIP (Niv. 1-2)</label>
+            <input type="number" id="hyp-cap-vip" min="0" step="50" value="1931" />
+            <div class="hint">places hospitality VIP</div>
+          </div>
+          <div class="hyp-item">
+            <label>Capacité VVIP (Niv. 3-5)</label>
+            <input type="number" id="hyp-cap-vvip" min="0" step="20" value="1080" />
+            <div class="hint">places hospitality premium</div>
           </div>
           <div class="hyp-item">
             <label>Taux de remplissage</label>
@@ -75,9 +86,9 @@
             <div class="hint">% (moyenne saison)</div>
           </div>
           <div class="hyp-item">
-            <label>Matchs à domicile</label>
-            <input type="number" id="hyp-matchs" min="0" step="1" value="17" />
-            <div class="hint">par saison (Super League)</div>
+            <label>Matchs à domicile / saison</label>
+            <input type="number" id="hyp-matchs" min="0" step="1" value="22" />
+            <div class="hint">FC Sion (20-25 selon coupes)</div>
           </div>
           <div class="hyp-item">
             <label>Coût staff / CA</label>
@@ -95,6 +106,51 @@
             <div class="hint">% du CA</div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Revenus annexes -->
+    <section id="annexes">
+      <h2 class="section-h2">Revenus annexes (Hospitality + Concerts)</h2>
+      <div class="card">
+        <div class="hyp-grid">
+          <div class="hyp-item">
+            <label>Forfait F&amp;B VIP / match</label>
+            <input type="number" id="hyp-vip-panier" min="0" step="5" value="80" />
+            <div class="hint">CHF par place VIP occupée</div>
+          </div>
+          <div class="hyp-item">
+            <label>Forfait F&amp;B VVIP / match</label>
+            <input type="number" id="hyp-vvip-panier" min="0" step="10" value="180" />
+            <div class="hint">CHF par place VVIP occupée</div>
+          </div>
+          <div class="hyp-item">
+            <label>Restaurant Niv. 6 - couverts / match</label>
+            <input type="number" id="hyp-restau-couverts" min="0" step="10" value="220" />
+            <div class="hint">zone gastro 1 512 m²</div>
+          </div>
+          <div class="hyp-item">
+            <label>Restaurant Niv. 6 - ticket moyen</label>
+            <input type="number" id="hyp-restau-panier" min="0" step="5" value="95" />
+            <div class="hint">CHF / couvert (food + boisson)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Nombre de concerts / an</label>
+            <input type="number" id="hyp-concerts" min="0" step="1" value="4" />
+            <div class="hint">événements grand public</div>
+          </div>
+          <div class="hyp-item">
+            <label>Jauge concert</label>
+            <input type="number" id="hyp-concert-jauge" min="0" step="500" value="21000" />
+            <div class="hint">config pleine 20 700-22 000</div>
+          </div>
+          <div class="hyp-item">
+            <label>Panier F&amp;B / spectateur concert</label>
+            <input type="number" id="hyp-concert-panier" min="0" step="1" value="22" />
+            <div class="hint">CHF / spectateur</div>
+          </div>
+        </div>
+        <table class="pnl-table" style="margin-top: 22px;" id="annexes-table"></table>
       </div>
     </section>
 

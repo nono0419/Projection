@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projections F&B · Stade FC Sion</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">FCS</div>
+      <div>
+        <div class="brand-title">STADE FC SION · OFFRE F&amp;B</div>
+        <div class="brand-subtitle">Projections financières · Saison régulière</div>
+      </div>
+    </div>
+    <nav class="topnav">
+      <a href="#kpis">KPIs</a>
+      <a href="#hypotheses">Hypothèses</a>
+      <a href="#charts">Graphiques</a>
+      <a href="#outlets">Outlets</a>
+      <a href="#pnl">P&amp;L</a>
+    </nav>
+  </header>
+
+  <div class="container">
+
+    <!-- KPIs -->
+    <section id="kpis">
+      <div class="section-title">Indicateurs clés · saison</div>
+      <div class="kpi-grid">
+        <div class="kpi-card accent">
+          <div class="kpi-label">Chiffre d'affaires</div>
+          <div class="kpi-value" id="kpi-ca">— CHF</div>
+          <div class="kpi-sub" id="kpi-ca-match">— / match</div>
+        </div>
+        <div class="kpi-card dark">
+          <div class="kpi-label">Marge brute</div>
+          <div class="kpi-value" id="kpi-mb">— CHF</div>
+          <div class="kpi-sub" id="kpi-mb-pct">— % du CA</div>
+        </div>
+        <div class="kpi-card good">
+          <div class="kpi-label">EBITDA</div>
+          <div class="kpi-value" id="kpi-ebitda">— CHF</div>
+          <div class="kpi-sub" id="kpi-ebitda-pct">— % du CA</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Panier moyen pondéré</div>
+          <div class="kpi-value" id="kpi-panier">— CHF</div>
+          <div class="kpi-sub" id="kpi-spec-actifs">— actes d'achat/match</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CA / spectateur</div>
+          <div class="kpi-value" id="kpi-ca-spec">— CHF</div>
+          <div class="kpi-sub">par match</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hypothèses globales -->
+    <section id="hypotheses">
+      <h2 class="section-h2">Hypothèses globales</h2>
+      <div class="card">
+        <div class="hyp-grid">
+          <div class="hyp-item">
+            <label>Capacité du stade</label>
+            <input type="number" id="hyp-capacite" min="0" step="500" value="15000" />
+            <div class="hint">spectateurs maxi</div>
+          </div>
+          <div class="hyp-item">
+            <label>Taux de remplissage</label>
+            <input type="number" id="hyp-remplissage" min="0" max="100" step="1" value="75" />
+            <div class="hint">% (moyenne saison)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Matchs à domicile</label>
+            <input type="number" id="hyp-matchs" min="0" step="1" value="17" />
+            <div class="hint">par saison (Super League)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Coût staff / CA</label>
+            <input type="number" id="hyp-staff" min="0" max="100" step="1" value="18" />
+            <div class="hint">% du CA (masse salariale)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Charges fixes annuelles</label>
+            <input type="number" id="hyp-charges" min="0" step="10000" value="650000" />
+            <div class="hint">CHF (concession, énergie, maintenance)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Frais marketing / CA</label>
+            <input type="number" id="hyp-marketing" min="0" max="100" step="0.5" value="3" />
+            <div class="hint">% du CA</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section id="charts">
+      <h2 class="section-h2">Vue analytique</h2>
+      <div class="charts-grid">
+        <div class="card">
+          <div class="card-title">Répartition du CA par catégorie</div>
+          <div class="chart-wrap"><canvas id="chart-cat"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Marge brute par catégorie (CHF)</div>
+          <div class="chart-wrap"><canvas id="chart-margin"></canvas></div>
+        </div>
+        <div class="card chart-wide">
+          <div class="card-title">Top outlets par CA saison (CHF)</div>
+          <div class="chart-wrap"><canvas id="chart-top"></canvas></div>
+        </div>
+        <div class="card chart-wide">
+          <div class="card-title">Évolution mensuelle du CA (saison Aug → Mai)</div>
+          <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outlets table -->
+    <section id="outlets">
+      <h2 class="section-h2">
+        Détail par outlet
+        <span class="toolbar-actions">
+          <button class="btn ghost" id="btn-reset">↺ Réinitialiser captures</button>
+          <button class="btn brand" id="btn-export">↓ Export CSV</button>
+        </span>
+      </h2>
+      <div class="outlets-toolbar" id="filters"></div>
+      <div style="overflow-x: auto;">
+        <table class="outlets-table" id="outlets-table">
+          <thead>
+            <tr>
+              <th>Outlet</th>
+              <th>Catégorie</th>
+              <th class="num">Panier moyen</th>
+              <th class="num">Capture (%)</th>
+              <th class="num">Actes / match</th>
+              <th class="num">CA / match</th>
+              <th class="num">CA saison</th>
+              <th class="num">Marge brute</th>
+            </tr>
+          </thead>
+          <tbody id="outlets-tbody"></tbody>
+          <tfoot id="outlets-tfoot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- P&L -->
+    <section id="pnl">
+      <h2 class="section-h2">Compte de résultat (P&amp;L saison)</h2>
+      <div class="card">
+        <table class="pnl-table" id="pnl-table"></table>
+      </div>
+    </section>
+
+    <footer>
+      Modèle de projection F&B · Stade FC Sion · les hypothèses et taux de capture sont éditables en direct.
+    </footer>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -10,7 +10,11 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <div class="brand-logo">FCS</div>
+      <div class="brand-logo-wrap">
+        <img src="public/assets/fcsion-logo.png" alt="FC Sion" class="brand-logo-img"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='grid';" />
+        <span class="brand-logo-fallback">FCS</span>
+      </div>
       <div>
         <div class="brand-title">STADE FC SION · OFFRE F&amp;B</div>
         <div class="brand-subtitle">Projections financières · Saison régulière</div>
@@ -27,6 +31,18 @@
   </header>
 
   <div class="container">
+
+    <div class="scenario-bar">
+      <div class="scenario-label">Scénario</div>
+      <div class="scenario-toggle" role="tablist" aria-label="Sélection du scénario">
+        <button class="scen-btn active" data-scen="conservative" type="button">Conservateur</button>
+        <button class="scen-btn" data-scen="ambitious" type="button">Ambitieux</button>
+        <button class="scen-btn" data-scen="custom" type="button">Personnalisé</button>
+      </div>
+      <div class="scenario-hint">
+        Conservateur / Ambitieux préremplit toutes les hypothèses. Toute modification d'un champ bascule sur Personnalisé.
+      </div>
+    </div>
 
     <!-- KPIs -->
     <section id="kpis">

@@ -16,6 +16,38 @@ const REF = {
   marge:       { min: 0.32,      max: 0.40,      label: "32 - 40 %" },
 };
 
+// Scénarios pré-calibrés (les chiffres tombent dans les fourchettes REF ci-dessus)
+const SCENARIOS = {
+  conservative: {
+    label: "Conservateur",
+    hyp: {
+      capPopulaire: 14743, capVIP: 1931, capVVIP: 1080,
+      remplissageGA: 0.55, remplissagePremium: 0.60,
+      matchs: 22,
+      panierVIP: 14, panierVVIP: 26,
+      restauCouverts: 180, restauPanier: 95, restauRemplissage: 0.55,
+      nbConcerts: 5, concertJauge: 17000, concertPanier: 11,
+      nbEventsCorpo: 175, panierEventCorpo: 6000,
+      staffPct: 0.18, marketingPct: 0.03, chargesFixes: 650000,
+    },
+    captureMultiplier: 1.0,
+  },
+  ambitious: {
+    label: "Ambitieux",
+    hyp: {
+      capPopulaire: 14743, capVIP: 1931, capVVIP: 1080,
+      remplissageGA: 0.68, remplissagePremium: 0.75,
+      matchs: 25,
+      panierVIP: 10, panierVVIP: 19,
+      restauCouverts: 180, restauPanier: 95, restauRemplissage: 0.55,
+      nbConcerts: 8, concertJauge: 21000, concertPanier: 10,
+      nbEventsCorpo: 200, panierEventCorpo: 9250,
+      staffPct: 0.15, marketingPct: 0.045, chargesFixes: 700000,
+    },
+    captureMultiplier: 1.0,
+  },
+};
+
 // Saisonnalité (Super League : pause hivernale décembre/janvier réduite)
 const MONTHLY_DIST = {
   Aug: 0.10, Sep: 0.13, Oct: 0.13, Nov: 0.13, Dec: 0.05,
@@ -58,7 +90,10 @@ const state = {
   captures: {},
   filter: "ALL",
   charts: {},
+  scenario: "conservative",
 };
+
+let isApplyingScenario = false;
 
 const COGS_ANNEXES = { vip: 0.30, vvip: 0.30, restau: 0.32, concerts: 0.28, corpo: 0.28 };
 
@@ -323,6 +358,7 @@ function renderOutletsTable(model) {
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val >= 0) {
         state.captures[id] = val / 100;
+        markCustomIfNeeded();
         renderAll({ skipTableRows: true });
       }
     });
@@ -526,11 +562,11 @@ function renderCharts(model) {
         {
           label: "Chiffre d'affaires",
           data: monthlyCA,
-          borderColor: "#c8102e",
-          backgroundColor: "rgba(200, 16, 46, 0.12)",
+          borderColor: "#E2001A",
+          backgroundColor: "rgba(226, 0, 26, 0.12)",
           fill: true,
           tension: 0.35,
-          pointBackgroundColor: "#c8102e",
+          pointBackgroundColor: "#E2001A",
           pointRadius: 4,
         },
         {
@@ -607,6 +643,69 @@ function renderAll(opts = {}) {
   }
 }
 
+/* ---------- Scénarios ---------- */
+function applyScenario(name) {
+  if (!SCENARIOS[name]) {
+    state.scenario = "custom";
+    updateScenarioUI();
+    return;
+  }
+  isApplyingScenario = true;
+  const s = SCENARIOS[name];
+  Object.assign(state.hyp, s.hyp);
+  OUTLETS_DATA.outlets.forEach(o => {
+    state.captures[o.id] = (CAPTURE_DEFAULT[o.id] ?? 0.03) * s.captureMultiplier;
+  });
+  state.scenario = name;
+  syncInputsFromState();
+  updateScenarioUI();
+  renderAll();
+  isApplyingScenario = false;
+}
+
+function syncInputsFromState() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const h = state.hyp;
+  set("hyp-cap-pop", h.capPopulaire);
+  set("hyp-cap-vip", h.capVIP);
+  set("hyp-cap-vvip", h.capVVIP);
+  set("hyp-remplissage-ga", Math.round(h.remplissageGA * 100));
+  set("hyp-remplissage-prem", Math.round(h.remplissagePremium * 100));
+  set("hyp-matchs", h.matchs);
+  set("hyp-staff", Math.round(h.staffPct * 1000) / 10);
+  set("hyp-charges", h.chargesFixes);
+  set("hyp-marketing", Math.round(h.marketingPct * 1000) / 10);
+  set("hyp-vip-panier", h.panierVIP);
+  set("hyp-vvip-panier", h.panierVVIP);
+  set("hyp-restau-couverts", h.restauCouverts);
+  set("hyp-restau-panier", h.restauPanier);
+  set("hyp-restau-remp", Math.round(h.restauRemplissage * 100));
+  set("hyp-concerts", h.nbConcerts);
+  set("hyp-concert-jauge", h.concertJauge);
+  set("hyp-concert-panier", h.concertPanier);
+  set("hyp-corpo-nb", h.nbEventsCorpo);
+  set("hyp-corpo-panier", h.panierEventCorpo);
+}
+
+function updateScenarioUI() {
+  document.querySelectorAll(".scen-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.scen === state.scenario);
+  });
+}
+
+function markCustomIfNeeded() {
+  if (!isApplyingScenario && state.scenario !== "custom") {
+    state.scenario = "custom";
+    updateScenarioUI();
+  }
+}
+
+function bindScenarios() {
+  document.querySelectorAll(".scen-btn").forEach(b => {
+    b.addEventListener("click", () => applyScenario(b.dataset.scen));
+  });
+}
+
 /* ---------- Bind hypothèses ---------- */
 function bindHypotheses() {
   const map = [
@@ -635,6 +734,7 @@ function bindHypotheses() {
       const v = parseFloat(e.target.value);
       if (!isNaN(v) && v >= 0) {
         state.hyp[key] = conv(v);
+        markCustomIfNeeded();
         renderAll();
       }
     });
@@ -644,10 +744,13 @@ function bindHypotheses() {
 /* ---------- Actions ---------- */
 function bindActions() {
   document.getElementById("btn-reset").addEventListener("click", () => {
+    const mult = SCENARIOS[state.scenario]?.captureMultiplier ?? 1.0;
+    isApplyingScenario = true;
     OUTLETS_DATA.outlets.forEach(o => {
-      state.captures[o.id] = CAPTURE_DEFAULT[o.id] ?? 0.03;
+      state.captures[o.id] = (CAPTURE_DEFAULT[o.id] ?? 0.03) * mult;
     });
     renderAll();
+    isApplyingScenario = false;
   });
 
   document.getElementById("btn-export").addEventListener("click", () => {
@@ -680,7 +783,8 @@ function bindActions() {
 
 /* ---------- Init ---------- */
 document.addEventListener("DOMContentLoaded", () => {
+  bindScenarios();
   bindHypotheses();
   bindActions();
-  renderAll();
+  applyScenario("conservative");
 });

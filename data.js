@@ -6,23 +6,20 @@ const CATEGORIES = {
   B: { label: "Saveurs internationales", color: "#D4882C", colorLight: "#FBEFD9" },
   C: { label: "Identité valaisanne", color: "#B33A3A", colorLight: "#F5DCDC" },
   D: { label: "Bars & boissons", color: "#2C4960", colorLight: "#D9E2EA" },
-  Merch: { label: "Merchandising", color: "#8A6FB5", colorLight: "#E8E0F3" },
 };
 
 // Capture par défaut = part des spectateurs qui consomment dans cet outlet sur un match
+// Calibré pour générer un CA outlets ~1,4 M (mid de la fourchette 1,15-2,20 M du rapport).
+// Total captures cumulé ~66%, soit ~5 400 actes/match sur 8 100 spectateurs GA.
 const CAPTURE_DEFAULT = {
-  "merch-01": 0.015,
-  "C-05": 0.040, "C-06": 0.025, "C-13": 0.020,
-  "B-08": 0.020, "B-15": 0.020, "B-14": 0.020, "B-09": 0.020,
-  "B-07": 0.020, "B-04": 0.020, "B-03": 0.020, "B-02": 0.020,
-  "A-18": 0.050, "A-19": 0.075, "A-20": 0.050,
-  "D-01a": 0.060, "D-01b": 0.050, "D-11": 0.025, "D-10": 0.030,
-  "A-16": 0.070, "A-PIZ": 0.060, "A-BUR": 0.070,
-  "D-BUV": 0.120,
+  "C-05": 0.030, "C-06": 0.020, "C-13": 0.015,
+  "B-08": 0.015, "B-15": 0.015, "B-14": 0.015, "B-09": 0.015,
+  "B-07": 0.015, "B-04": 0.015, "B-03": 0.015, "B-02": 0.015,
+  "A-18": 0.035, "A-19": 0.060, "A-20": 0.035,
+  "D-01a": 0.045, "D-01b": 0.035, "D-11": 0.020, "D-10": 0.025,
+  "A-16": 0.050, "A-PIZ": 0.045, "A-BUR": 0.050,
+  "D-BUV": 0.075,
 };
-
-// Panier moyen par défaut pour Merch (pas de prix dans le JSON source)
-const PANIER_DEFAULT_MERCH = 28;
 
 const OUTLETS_DATA = {
   "meta": {
@@ -30,13 +27,6 @@ const OUTLETS_DATA = {
     "devise": "CHF",
   },
   "outlets": [
-    { "id": "merch-01", "nom": "La Gamme Goodies Valaisans", "categorie": "Merch", "niveau": "Boutique Niv.1 + Stands F&B", "description": "Gamme signature co-brandée FC Sion, produite en Valais.", "items": [
-      {"nom": "Fendant (blanc AOC Valais) - bouteille", "prix": null},
-      {"nom": "Petite Arvine premium - bouteille", "prix": null},
-      {"nom": "Syrah rouge - bouteille", "prix": null},
-      {"nom": "Bière du Valais co-brandée - bouteille", "prix": null},
-      {"nom": "Verres collector (gobelet effigie)", "prix": null}
-    ]},
     { "id": "C-05", "nom": "La Cave à Raclette", "categorie": "C", "niveau": "REZ - stand vedette", "description": "Raclette et planchette valaisanne, fromage AOP d'alpage.", "items": [
       {"nom": "Assiette Raclette AOP", "prix": 5},
       {"nom": "Assiette Raclette AOP à discrétion", "prix": 35},
@@ -162,10 +152,12 @@ const OUTLETS_DATA = {
       {"nom": "Bière pression locale 5dl", "prix": 9},
       {"nom": "Consigne gobelet réutilisable", "prix": 2}
     ]},
-    { "id": "D-01b", "nom": "Distributeur de Bière", "categorie": "D", "niveau": "Tribunes GA", "description": "Bar self-service avec contrôle d'âge via app mobile.", "items": [
-      {"nom": "Bière pression locale 3dl", "prix": 6},
-      {"nom": "Bière pression locale 5dl", "prix": 9},
-      {"nom": "Consigne gobelet réutilisable", "prix": 2}
+    { "id": "D-01b", "nom": "Borne Boissons Self-Service", "categorie": "D", "niveau": "Tribunes GA", "description": "Distributeur self-service de boissons non alcoolisées (sodas, eau, café, énergisants) - paiement par app.", "items": [
+      {"nom": "Soda 33cl (Coca, Sprite, Fanta)", "prix": 4.5},
+      {"nom": "Ice Tea / boissons fruitées 33cl", "prix": 4.5},
+      {"nom": "Eau minérale valaisanne 50cl", "prix": 4},
+      {"nom": "Boisson énergisante (Red Bull)", "prix": 6},
+      {"nom": "Café / Boisson chaude", "prix": 5}
     ]},
     { "id": "D-11", "nom": "Bar Robotique à Cocktails", "categorie": "D", "niveau": "REZ", "description": "Bras robotisés préparant cocktails et mocktails en <90s.", "items": [
       {"nom": "Cocktail signature robot (classique)", "prix": 14},

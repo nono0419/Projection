@@ -33,29 +33,29 @@
       <div class="section-title">Indicateurs clés · saison</div>
       <div class="kpi-grid">
         <div class="kpi-card accent">
-          <div class="kpi-label">Chiffre d'affaires</div>
+          <div class="kpi-label">CA F&amp;B total saison</div>
           <div class="kpi-value" id="kpi-ca">— CHF</div>
-          <div class="kpi-sub" id="kpi-ca-match">— / match</div>
+          <div class="kpi-sub" id="kpi-ca-match">—</div>
         </div>
         <div class="kpi-card dark">
-          <div class="kpi-label">Marge brute</div>
+          <div class="kpi-label">Marge sur coût matière</div>
           <div class="kpi-value" id="kpi-mb">— CHF</div>
-          <div class="kpi-sub" id="kpi-mb-pct">— % du CA</div>
+          <div class="kpi-sub" id="kpi-mb-pct">— sur coût matière</div>
         </div>
         <div class="kpi-card good">
           <div class="kpi-label">EBITDA</div>
           <div class="kpi-value" id="kpi-ebitda">— CHF</div>
-          <div class="kpi-sub" id="kpi-ebitda-pct">— % du CA</div>
+          <div class="kpi-sub" id="kpi-ebitda-pct">—</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Panier moyen pondéré</div>
+          <div class="kpi-label">CA F&amp;B / spectateur GA</div>
           <div class="kpi-value" id="kpi-panier">— CHF</div>
-          <div class="kpi-sub" id="kpi-spec-actifs">— actes d'achat/match</div>
+          <div class="kpi-sub" id="kpi-spec-actifs">—</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">CA / spectateur</div>
-          <div class="kpi-value" id="kpi-ca-spec">— CHF</div>
-          <div class="kpi-sub">par match</div>
+          <div class="kpi-label">Actes d'achat / match</div>
+          <div class="kpi-value" id="kpi-ca-spec">—</div>
+          <div class="kpi-sub">commandes outlets / match</div>
         </div>
       </div>
     </section>
@@ -81,9 +81,14 @@
             <div class="hint">places hospitality premium</div>
           </div>
           <div class="hyp-item">
-            <label>Taux de remplissage</label>
-            <input type="number" id="hyp-remplissage" min="0" max="100" step="1" value="75" />
-            <div class="hint">% (moyenne saison)</div>
+            <label>Remplissage GA (zone A+B)</label>
+            <input type="number" id="hyp-remplissage-ga" min="0" max="100" step="1" value="55" />
+            <div class="hint">% → ~8 100 spect. (réf. 7 820-9 500)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Occupation Premium (VIP/VVIP)</label>
+            <input type="number" id="hyp-remplissage-prem" min="0" max="100" step="1" value="60" />
+            <div class="hint">% des loges occupées</div>
           </div>
           <div class="hyp-item">
             <label>Matchs à domicile / saison</label>
@@ -111,22 +116,22 @@
 
     <!-- Revenus annexes -->
     <section id="annexes">
-      <h2 class="section-h2">Revenus annexes (Hospitality + Concerts)</h2>
+      <h2 class="section-h2">Revenus annexes (Hospitality · Concerts · C&amp;E)</h2>
       <div class="card">
         <div class="hyp-grid">
           <div class="hyp-item">
             <label>Forfait F&amp;B VIP / match</label>
-            <input type="number" id="hyp-vip-panier" min="0" step="5" value="80" />
-            <div class="hint">CHF par place VIP occupée</div>
+            <input type="number" id="hyp-vip-panier" min="0" step="1" value="14" />
+            <div class="hint">CHF add-on F&amp;B / place VIP occupée</div>
           </div>
           <div class="hyp-item">
             <label>Forfait F&amp;B VVIP / match</label>
-            <input type="number" id="hyp-vvip-panier" min="0" step="10" value="180" />
-            <div class="hint">CHF par place VVIP occupée</div>
+            <input type="number" id="hyp-vvip-panier" min="0" step="1" value="26" />
+            <div class="hint">CHF add-on F&amp;B / place VVIP occupée</div>
           </div>
           <div class="hyp-item">
             <label>Restaurant Niv. 6 - couverts / match</label>
-            <input type="number" id="hyp-restau-couverts" min="0" step="10" value="220" />
+            <input type="number" id="hyp-restau-couverts" min="0" step="10" value="180" />
             <div class="hint">zone gastro 1 512 m²</div>
           </div>
           <div class="hyp-item">
@@ -135,19 +140,34 @@
             <div class="hint">CHF / couvert (food + boisson)</div>
           </div>
           <div class="hyp-item">
-            <label>Nombre de concerts / an</label>
-            <input type="number" id="hyp-concerts" min="0" step="1" value="4" />
-            <div class="hint">événements grand public</div>
+            <label>Restaurant Niv. 6 - remplissage</label>
+            <input type="number" id="hyp-restau-remp" min="0" max="100" step="5" value="55" />
+            <div class="hint">% couverts servis / capacité</div>
           </div>
           <div class="hyp-item">
-            <label>Jauge concert</label>
-            <input type="number" id="hyp-concert-jauge" min="0" step="500" value="21000" />
-            <div class="hint">config pleine 20 700-22 000</div>
+            <label>Nombre de concerts / an</label>
+            <input type="number" id="hyp-concerts" min="0" step="1" value="5" />
+            <div class="hint">5-8 (réf. rapport)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Jauge concert moyenne</label>
+            <input type="number" id="hyp-concert-jauge" min="0" step="500" value="17000" />
+            <div class="hint">~80% des 21 000 places</div>
           </div>
           <div class="hyp-item">
             <label>Panier F&amp;B / spectateur concert</label>
-            <input type="number" id="hyp-concert-panier" min="0" step="1" value="22" />
+            <input type="number" id="hyp-concert-panier" min="0" step="1" value="11" />
             <div class="hint">CHF / spectateur</div>
+          </div>
+          <div class="hyp-item">
+            <label>Rentals + C&amp;E - events / an</label>
+            <input type="number" id="hyp-corpo-nb" min="0" step="5" value="175" />
+            <div class="hint">175-200 (réf. rapport)</div>
+          </div>
+          <div class="hyp-item">
+            <label>Rentals + C&amp;E - ticket / event</label>
+            <input type="number" id="hyp-corpo-panier" min="0" step="500" value="6000" />
+            <div class="hint">CHF / événement corporate moyen</div>
           </div>
         </div>
         <table class="pnl-table" style="margin-top: 22px;" id="annexes-table"></table>

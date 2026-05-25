@@ -3,7 +3,18 @@
  * Modèle de calcul + UI interactive
  * ========================================================= */
 
-const COGS_RATIO = { A: 0.30, B: 0.32, C: 0.35, D: 0.22, Merch: 0.50 };
+const COGS_RATIO = { A: 0.32, B: 0.35, C: 0.38, D: 0.25 };
+
+// Fourchettes de référence du rapport de conseil Cervin Coliseum
+const REF = {
+  matchday:    { min: 1_150_000, max: 2_200_000, label: "1,15 - 2,20 M" },
+  hospitality: { min:   700_000, max:   750_000, label: "0,70 - 0,75 M" },
+  concerts:    { min:   860_000, max: 1_800_000, label: "0,86 - 1,80 M" },
+  rentals:     { min:   950_000, max: 1_850_000, label: "0,95 - 1,85 M" },
+  totalCA:     { min: 3_660_000, max: 6_600_000, label: "3,66 - 6,60 M" },
+  caPerSpec:   { min: 21,        max: 26,        label: "21 - 26 CHF" },
+  marge:       { min: 0.32,      max: 0.40,      label: "32 - 40 %" },
+};
 
 // Saisonnalité (Super League : pause hivernale décembre/janvier réduite)
 const MONTHLY_DIST = {
@@ -23,27 +34,33 @@ const state = {
     capPopulaire: 14743,
     capVIP: 1931,
     capVVIP: 1080,
-    remplissage: 0.75,
+    remplissageGA: 0.55,        // ~8 100 spectateurs GA (cible rapport: 7 820-9 500)
+    remplissagePremium: 0.60,   // taux d'occupation moyen des loges premium
     matchs: 22,
     staffPct: 0.18,
     chargesFixes: 650000,
     marketingPct: 0.03,
-    // Annexes
-    panierVIP: 80,
-    panierVVIP: 180,
-    restauCouverts: 220,
+    // Hospitality (forfaits F&B add-on par place occupée)
+    panierVIP: 14,
+    panierVVIP: 26,
+    // Restaurant gastro Niv. 6 (compté dans matchday)
+    restauCouverts: 180,
     restauPanier: 95,
-    nbConcerts: 4,
-    concertJauge: 21000,
-    concertPanier: 22,
+    restauRemplissage: 0.55,
+    // Concerts (5-8 / an, 0,86-1,80 M)
+    nbConcerts: 5,
+    concertJauge: 17000,
+    concertPanier: 11,
+    // Rentals + C&E (175-200 events / an, 0,95-1,85 M)
+    nbEventsCorpo: 175,
+    panierEventCorpo: 6000,
   },
-  captures: {},          // id -> taux (0..1)
+  captures: {},
   filter: "ALL",
   charts: {},
 };
 
-// COGS pour revenus annexes
-const COGS_ANNEXES = { vip: 0.30, vvip: 0.32, restau: 0.32, concerts: 0.28 };
+const COGS_ANNEXES = { vip: 0.30, vvip: 0.30, restau: 0.32, concerts: 0.28, corpo: 0.28 };
 
 /* ---------- Init capture par défaut ---------- */
 OUTLETS_DATA.outlets.forEach(o => {
@@ -52,42 +69,52 @@ OUTLETS_DATA.outlets.forEach(o => {
 
 /* ---------- Helpers ---------- */
 function panierMoyen(outlet) {
-  if (outlet.categorie === "Merch") return PANIER_DEFAULT_MERCH;
   const prix = outlet.items.map(i => i.prix).filter(p => typeof p === "number" && p > 0);
   if (!prix.length) return 0;
   return prix.reduce((s, p) => s + p, 0) / prix.length;
 }
 
 function spectateursParMatch() {
-  // Base outlet = zone populaire (A+B), seule zone qui consomme dans les outlets
-  return state.hyp.capPopulaire * state.hyp.remplissage;
+  return state.hyp.capPopulaire * state.hyp.remplissageGA;
+}
+
+function compareRef(value, ref) {
+  if (!ref) return { status: "neutral", icon: "" };
+  if (value >= ref.min && value <= ref.max) return { status: "ok", icon: "✓" };
+  if (value < ref.min) return { status: "low", icon: "↓" };
+  return { status: "high", icon: "↑" };
 }
 
 function computeAnnexes() {
   const h = state.hyp;
-  const r = h.remplissage;
-  // Hospitality VIP : forfait inclus dans le pack hospitality, payé pour chaque place occupée
-  const caVIP = h.capVIP * r * h.panierVIP * h.matchs;
-  const caVVIP = h.capVVIP * r * h.panierVVIP * h.matchs;
-  // Restaurant gastro Niv. 6 : couverts servis × ticket × matchs (linéaire au remplissage)
-  const caRestau = h.restauCouverts * r * h.restauPanier * h.matchs;
-  // Concerts : événements externes
+  // Hospitality : forfaits F&B add-on par place occupée (en sus du pack saison)
+  const caVIP = h.capVIP * h.remplissagePremium * h.panierVIP * h.matchs;
+  const caVVIP = h.capVVIP * h.remplissagePremium * h.panierVVIP * h.matchs;
+  // Restaurant gastro Niv. 6 : couverts servis × ticket × matchs
+  const caRestau = h.restauCouverts * h.restauRemplissage * h.restauPanier * h.matchs;
+  // Concerts
   const caConcerts = h.nbConcerts * h.concertJauge * h.concertPanier;
+  // Rentals + C&E (séminaires, mariages, conférences, journées corporate)
+  const caCorpo = h.nbEventsCorpo * h.panierEventCorpo;
 
   const cogsVIP = caVIP * COGS_ANNEXES.vip;
   const cogsVVIP = caVVIP * COGS_ANNEXES.vvip;
   const cogsRestau = caRestau * COGS_ANNEXES.restau;
   const cogsConcerts = caConcerts * COGS_ANNEXES.concerts;
+  const cogsCorpo = caCorpo * COGS_ANNEXES.corpo;
 
-  const totalCA = caVIP + caVVIP + caRestau + caConcerts;
-  const totalCOGS = cogsVIP + cogsVVIP + cogsRestau + cogsConcerts;
+  const totalCA = caVIP + caVVIP + caRestau + caConcerts + caCorpo;
+  const totalCOGS = cogsVIP + cogsVVIP + cogsRestau + cogsConcerts + cogsCorpo;
   return {
     items: [
-      { key: "vip", label: "Hospitality VIP (Niv. 1-2)", ca: caVIP, cogs: cogsVIP },
-      { key: "vvip", label: "Hospitality VVIP (Niv. 3-5)", ca: caVVIP, cogs: cogsVVIP },
-      { key: "restau", label: "Restaurant gastro Niveau 6", ca: caRestau, cogs: cogsRestau },
+      { key: "vip",      label: "Hospitality VIP (Niv. 1-2)",      ca: caVIP,      cogs: cogsVIP },
+      { key: "vvip",     label: "Hospitality VVIP (Niv. 3-5)",     ca: caVVIP,     cogs: cogsVVIP },
+      { key: "restau",   label: "Restaurant gastro Niv. 6 (matchday)", ca: caRestau, cogs: cogsRestau },
       { key: "concerts", label: `Concerts (${h.nbConcerts} événements)`, ca: caConcerts, cogs: cogsConcerts },
+      { key: "corpo",    label: `Rentals & C&E (${h.nbEventsCorpo} events)`, ca: caCorpo,   cogs: cogsCorpo },
     ],
+    caVIP, caVVIP, caHospitality: caVIP + caVVIP,
+    caRestau, caConcerts, caCorpo,
     totalCA, totalCOGS, margeBrute: totalCA - totalCOGS,
   };
 }
@@ -99,7 +126,7 @@ function computeOutletMetrics(o) {
   const actesMatch = spectMatch * capture;
   const caMatch = actesMatch * panier;
   const caSaison = caMatch * state.hyp.matchs;
-  const cogs = caSaison * (COGS_RATIO[o.categorie] ?? 0.30);
+  const cogs = caSaison * (COGS_RATIO[o.categorie] ?? 0.32);
   const margeBrute = caSaison - cogs;
   return { capture, panier, actesMatch, caMatch, caSaison, cogs, margeBrute };
 }
@@ -112,19 +139,28 @@ function computeAll() {
 
   const totals = {
     caSaison: 0, cogs: 0, margeBrute: 0, actesMatch: 0,
-    parCategorie: { A: 0, B: 0, C: 0, D: 0, Merch: 0 },
-    margeParCategorie: { A: 0, B: 0, C: 0, D: 0, Merch: 0 },
+    parCategorie: { A: 0, B: 0, C: 0, D: 0 },
+    margeParCategorie: { A: 0, B: 0, C: 0, D: 0 },
   };
   rows.forEach(r => {
     totals.caSaison += r.caSaison;
     totals.cogs += r.cogs;
     totals.margeBrute += r.margeBrute;
     totals.actesMatch += r.actesMatch;
-    totals.parCategorie[r.outlet.categorie] += r.caSaison;
-    totals.margeParCategorie[r.outlet.categorie] += r.margeBrute;
+    if (totals.parCategorie[r.outlet.categorie] !== undefined) {
+      totals.parCategorie[r.outlet.categorie] += r.caSaison;
+      totals.margeParCategorie[r.outlet.categorie] += r.margeBrute;
+    }
   });
 
   const annexes = computeAnnexes();
+
+  // Regroupements alignés sur les lignes du rapport Cervin Coliseum
+  const caMatchday = totals.caSaison + annexes.caRestau;  // outlets + restau matchday
+  const caHospitality = annexes.caHospitality;
+  const caConcerts = annexes.caConcerts;
+  const caCorpo = annexes.caCorpo;
+
   const caGlobal = totals.caSaison + annexes.totalCA;
   const cogsGlobal = totals.cogs + annexes.totalCOGS;
   const margeBruteGlobale = totals.margeBrute + annexes.margeBrute;
@@ -134,38 +170,50 @@ function computeAll() {
   const chargesFixes = state.hyp.chargesFixes;
   const ebitda = margeBruteGlobale - staff - marketing - chargesFixes;
 
+  // CA F&B par spectateur GA (référence rapport: 21-26 CHF)
+  const gaSpectateurMatchs = spectateursParMatch() * state.hyp.matchs;
+  const caPerSpec = gaSpectateurMatchs ? caGlobal / gaSpectateurMatchs : 0;
+  const margeOp = caGlobal ? ebitda / caGlobal : 0;
+
   return { rows, totals, annexes, caGlobal, cogsGlobal, margeBruteGlobale,
+           caMatchday, caHospitality, caConcerts, caCorpo,
+           caPerSpec, margeOp, gaSpectateurMatchs,
            staff, marketing, chargesFixes, ebitda };
 }
 
 /* ---------- Rendu KPIs ---------- */
+function refBadge(value, ref) {
+  const cmp = compareRef(value, ref);
+  const colors = { ok: "#2e8b57", low: "#c0392b", high: "#c0392b", neutral: "#8a93a5" };
+  return `<span style="color:${colors[cmp.status]};font-weight:700;">${cmp.icon}</span>
+          <span style="color:#8a93a5;font-size:11px;">réf ${ref.label}</span>`;
+}
+
 function renderKPIs(model) {
-  const { totals, annexes, caGlobal, margeBruteGlobale, ebitda } = model;
-  const caMatch = state.hyp.matchs ? totals.caSaison / state.hyp.matchs : 0;
-  const spectMatch = spectateursParMatch();
-  const panierPond = totals.actesMatch ? caMatch / totals.actesMatch : 0;
+  const { totals, annexes, caGlobal, margeBruteGlobale, ebitda, caPerSpec, margeOp } = model;
 
   document.getElementById("kpi-ca").textContent = fmt.format(caGlobal) + " CHF";
-  document.getElementById("kpi-ca-match").textContent =
-    `${fmt.format(totals.caSaison)} outlets + ${fmt.format(annexes.totalCA)} annexes`;
+  document.getElementById("kpi-ca-match").innerHTML = refBadge(caGlobal, REF.totalCA);
 
   document.getElementById("kpi-mb").textContent = fmt.format(margeBruteGlobale) + " CHF";
   document.getElementById("kpi-mb-pct").textContent =
-    (caGlobal ? fmtPct.format(margeBruteGlobale / caGlobal) : "—") + " du CA";
+    (caGlobal ? fmtPct.format(margeBruteGlobale / caGlobal) : "—") + " sur coût matière";
 
   const ebitdaEl = document.getElementById("kpi-ebitda");
   ebitdaEl.textContent = fmt.format(ebitda) + " CHF";
   ebitdaEl.parentElement.classList.toggle("good", ebitda >= 0);
   ebitdaEl.parentElement.classList.toggle("bad", ebitda < 0);
-  document.getElementById("kpi-ebitda-pct").textContent =
-    (caGlobal ? fmtPct.format(ebitda / caGlobal) : "—") + " du CA";
+  document.getElementById("kpi-ebitda-pct").innerHTML =
+    (caGlobal ? fmtPct.format(margeOp) : "—") + " marge opérationnelle &nbsp; " +
+    refBadge(margeOp, REF.marge);
 
-  document.getElementById("kpi-panier").textContent = fmt2.format(panierPond) + " CHF";
-  document.getElementById("kpi-spec-actifs").textContent =
-    fmt.format(totals.actesMatch) + " actes d'achat / match";
+  document.getElementById("kpi-panier").textContent = fmt2.format(caPerSpec) + " CHF";
+  document.getElementById("kpi-spec-actifs").innerHTML =
+    "CA F&amp;B / spectateur GA &nbsp; " + refBadge(caPerSpec, REF.caPerSpec);
 
-  document.getElementById("kpi-ca-spec").textContent =
-    (spectMatch ? fmt2.format(caMatch / spectMatch) : "—") + " CHF";
+  document.getElementById("kpi-ca-spec").textContent = fmt.format(totals.actesMatch);
+  document.getElementById("kpi-ca-spec").nextElementSibling &&
+    (document.getElementById("kpi-ca-spec").nextElementSibling.textContent = "actes d'achat / match (outlets)");
 }
 
 /* ---------- Rendu annexes table ---------- */
@@ -282,60 +330,99 @@ function renderOutletsTable(model) {
 }
 
 /* ---------- Rendu P&L ---------- */
+function refCell(value, ref) {
+  if (!ref) return "";
+  const cmp = compareRef(value, ref);
+  const colors = { ok: "#2e8b57", low: "#c0392b", high: "#c0392b" };
+  return `<span style="color:${colors[cmp.status]};font-weight:700;margin-right:4px;">${cmp.icon}</span><span style="color:#8a93a5;font-size:11px;">réf ${ref.label}</span>`;
+}
+
 function renderPnL(model) {
   const { totals, annexes, caGlobal, cogsGlobal, margeBruteGlobale,
-          staff, marketing, chargesFixes, ebitda } = model;
+          caMatchday, caHospitality, caConcerts, caCorpo,
+          margeOp, staff, marketing, chargesFixes, ebitda } = model;
   const ca = caGlobal;
   const p = (v) => ca ? fmtPct.format(v / ca) : "—";
+
   const html = `
     <tbody>
-      <tr><td class="lbl">CA Outlets - Bars &amp; boissons</td>
+      <tr><td class="lbl" style="padding-left:24px;">Outlets · Bars &amp; boissons</td>
           <td class="val">${fmt.format(totals.parCategorie.D)}</td>
-          <td class="pct">${p(totals.parCategorie.D)}</td></tr>
-      <tr><td class="lbl">CA Outlets - Standards populaires</td>
+          <td class="pct">${p(totals.parCategorie.D)}</td>
+          <td></td></tr>
+      <tr><td class="lbl" style="padding-left:24px;">Outlets · Standards populaires</td>
           <td class="val">${fmt.format(totals.parCategorie.A)}</td>
-          <td class="pct">${p(totals.parCategorie.A)}</td></tr>
-      <tr><td class="lbl">CA Outlets - Saveurs internationales</td>
+          <td class="pct">${p(totals.parCategorie.A)}</td>
+          <td></td></tr>
+      <tr><td class="lbl" style="padding-left:24px;">Outlets · Saveurs internationales</td>
           <td class="val">${fmt.format(totals.parCategorie.B)}</td>
-          <td class="pct">${p(totals.parCategorie.B)}</td></tr>
-      <tr><td class="lbl">CA Outlets - Identité valaisanne</td>
+          <td class="pct">${p(totals.parCategorie.B)}</td>
+          <td></td></tr>
+      <tr><td class="lbl" style="padding-left:24px;">Outlets · Identité valaisanne</td>
           <td class="val">${fmt.format(totals.parCategorie.C)}</td>
-          <td class="pct">${p(totals.parCategorie.C)}</td></tr>
-      <tr><td class="lbl">CA Outlets - Merchandising</td>
-          <td class="val">${fmt.format(totals.parCategorie.Merch)}</td>
-          <td class="pct">${p(totals.parCategorie.Merch)}</td></tr>
-      <tr class="subtotal"><td>Sous-total outlets</td>
-          <td class="val">${fmt.format(totals.caSaison)}</td>
-          <td class="pct">${p(totals.caSaison)}</td></tr>
-      ${annexes.items.map(i => `
-        <tr><td class="lbl">${i.label}</td>
-            <td class="val">${fmt.format(i.ca)}</td>
-            <td class="pct">${p(i.ca)}</td></tr>
-      `).join("")}
-      <tr class="subtotal"><td>Sous-total annexes</td>
-          <td class="val">${fmt.format(annexes.totalCA)}</td>
-          <td class="pct">${p(annexes.totalCA)}</td></tr>
-      <tr class="subtotal"><td>Total chiffre d'affaires</td>
+          <td class="pct">${p(totals.parCategorie.C)}</td>
+          <td></td></tr>
+      <tr><td class="lbl" style="padding-left:24px;">Restaurant gastro Niv. 6 (matchday)</td>
+          <td class="val">${fmt.format(annexes.caRestau)}</td>
+          <td class="pct">${p(annexes.caRestau)}</td>
+          <td></td></tr>
+      <tr class="subtotal"><td>1. Matchday FC Sion</td>
+          <td class="val">${fmt.format(caMatchday)}</td>
+          <td class="pct">${p(caMatchday)}</td>
+          <td>${refCell(caMatchday, REF.matchday)}</td></tr>
+
+      <tr><td class="lbl" style="padding-left:24px;">Hospitality VIP (Niv. 1-2)</td>
+          <td class="val">${fmt.format(annexes.caVIP)}</td>
+          <td class="pct">${p(annexes.caVIP)}</td>
+          <td></td></tr>
+      <tr><td class="lbl" style="padding-left:24px;">Hospitality VVIP (Niv. 3-5)</td>
+          <td class="val">${fmt.format(annexes.caVVIP)}</td>
+          <td class="pct">${p(annexes.caVVIP)}</td>
+          <td></td></tr>
+      <tr class="subtotal"><td>2. Hospitality VIP + VVIP</td>
+          <td class="val">${fmt.format(caHospitality)}</td>
+          <td class="pct">${p(caHospitality)}</td>
+          <td>${refCell(caHospitality, REF.hospitality)}</td></tr>
+
+      <tr class="subtotal"><td>3. Concerts (${state.hyp.nbConcerts} événements)</td>
+          <td class="val">${fmt.format(caConcerts)}</td>
+          <td class="pct">${p(caConcerts)}</td>
+          <td>${refCell(caConcerts, REF.concerts)}</td></tr>
+
+      <tr class="subtotal"><td>4. Rentals + C&amp;E (${state.hyp.nbEventsCorpo} events)</td>
+          <td class="val">${fmt.format(caCorpo)}</td>
+          <td class="pct">${p(caCorpo)}</td>
+          <td>${refCell(caCorpo, REF.rentals)}</td></tr>
+
+      <tr class="total"><td>Total chiffre d'affaires F&amp;B</td>
           <td class="val">${fmt.format(ca)}</td>
-          <td class="pct">100%</td></tr>
-      <tr><td class="lbl">Coût des marchandises (COGS)</td>
+          <td class="pct">100%</td>
+          <td>${refCell(ca, REF.totalCA)}</td></tr>
+
+      <tr><td class="lbl">Coût matière (COGS)</td>
           <td class="val">- ${fmt.format(cogsGlobal)}</td>
-          <td class="pct">${p(cogsGlobal)}</td></tr>
-      <tr class="subtotal"><td>Marge brute</td>
+          <td class="pct">${p(cogsGlobal)}</td>
+          <td></td></tr>
+      <tr class="subtotal"><td>Marge sur coût matière</td>
           <td class="val">${fmt.format(margeBruteGlobale)}</td>
-          <td class="pct">${p(margeBruteGlobale)}</td></tr>
+          <td class="pct">${p(margeBruteGlobale)}</td>
+          <td></td></tr>
       <tr><td class="lbl">Masse salariale</td>
           <td class="val">- ${fmt.format(staff)}</td>
-          <td class="pct">${p(staff)}</td></tr>
+          <td class="pct">${p(staff)}</td>
+          <td></td></tr>
       <tr><td class="lbl">Marketing &amp; communication</td>
           <td class="val">- ${fmt.format(marketing)}</td>
-          <td class="pct">${p(marketing)}</td></tr>
+          <td class="pct">${p(marketing)}</td>
+          <td></td></tr>
       <tr><td class="lbl">Charges fixes (concession, énergie, maintenance)</td>
           <td class="val">- ${fmt.format(chargesFixes)}</td>
-          <td class="pct">${p(chargesFixes)}</td></tr>
-      <tr class="total"><td>EBITDA</td>
+          <td class="pct">${p(chargesFixes)}</td>
+          <td></td></tr>
+      <tr class="total"><td>EBITDA (marge opérationnelle)</td>
           <td class="val">${fmt.format(ebitda)}</td>
-          <td class="pct">${p(ebitda)}</td></tr>
+          <td class="pct">${ca ? fmtPct.format(margeOp) : "—"}</td>
+          <td>${refCell(margeOp, REF.marge)}</td></tr>
     </tbody>
   `;
   document.getElementById("pnl-table").innerHTML = html;
@@ -526,7 +613,8 @@ function bindHypotheses() {
     ["hyp-cap-pop", "capPopulaire", v => v],
     ["hyp-cap-vip", "capVIP", v => v],
     ["hyp-cap-vvip", "capVVIP", v => v],
-    ["hyp-remplissage", "remplissage", v => v / 100],
+    ["hyp-remplissage-ga", "remplissageGA", v => v / 100],
+    ["hyp-remplissage-prem", "remplissagePremium", v => v / 100],
     ["hyp-matchs", "matchs", v => v],
     ["hyp-staff", "staffPct", v => v / 100],
     ["hyp-charges", "chargesFixes", v => v],
@@ -535,9 +623,12 @@ function bindHypotheses() {
     ["hyp-vvip-panier", "panierVVIP", v => v],
     ["hyp-restau-couverts", "restauCouverts", v => v],
     ["hyp-restau-panier", "restauPanier", v => v],
+    ["hyp-restau-remp", "restauRemplissage", v => v / 100],
     ["hyp-concerts", "nbConcerts", v => v],
     ["hyp-concert-jauge", "concertJauge", v => v],
     ["hyp-concert-panier", "concertPanier", v => v],
+    ["hyp-corpo-nb", "nbEventsCorpo", v => v],
+    ["hyp-corpo-panier", "panierEventCorpo", v => v],
   ];
   map.forEach(([elId, key, conv]) => {
     document.getElementById(elId).addEventListener("input", e => {
